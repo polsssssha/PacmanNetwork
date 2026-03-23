@@ -8,7 +8,6 @@ public class DesktopLauncher {
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("Pacman Multiplayer");
 
-        // Устанавливаем размер окна точно под карту
         config.setWindowedMode(460, 440);
 
         config.setForegroundFPS(60);

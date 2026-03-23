@@ -19,16 +19,18 @@ import io.netty.handler.codec.serialization.ObjectEncoder;
 
 public class PacmanGame extends ApplicationAdapter {
 
-    java.util.List<com.pacman.common.PacketPlayerPos> otherPlayers = new java.util.ArrayList<>();
+    volatile java.util.List<com.pacman.common.PacketPlayerPos> otherPlayers = new java.util.ArrayList<>();
     SpriteBatch batch;
     Texture wallTex;
     Texture pacmanTex;
     GameMap map;
     Channel channel;
+    Texture otherPacTex;
+    String myId;
 
     int currX = 1, currY = 1;
     int targetX = 1, targetY = 1;
-    float visualX = 20, visualY = 20; // Реальные пиксели для отрисовки
+    float visualX = 20, visualY = 20;
     float progress = 1.0f;
 
     @Override
@@ -47,6 +49,12 @@ public class PacmanGame extends ApplicationAdapter {
         pacmanTex = new Texture(pPac);
         pPac.dispose();
 
+        Pixmap pOther = new Pixmap(18, 18, Pixmap.Format.RGBA8888);
+        pOther.setColor(1f, 0.7f, 0.3f, 1);
+        pOther.fill();
+        otherPacTex = new Texture(pOther);
+        pOther.dispose();
+
         map = new GameMap(23, 22);
 
         new Thread(() -> {
@@ -60,11 +68,14 @@ public class PacmanGame extends ApplicationAdapter {
                             public void initChannel(SocketChannel ch) {
                                 ch.pipeline().addLast(new ObjectEncoder());
                                 ch.pipeline().addLast(new ObjectDecoder(ClassResolvers.cacheDisabled(null)));
-                                ch.pipeline().addLast(new ClientHandler(PacmanGame.this)); // Передаем ссылку на игру
+                                ch.pipeline().addLast(new ClientHandler(PacmanGame.this));
                             }
                         });
                 Channel ch = b.connect("localhost", 8080).sync().channel();
-                this.channel = ch; // Сохраняем канал в поле класса
+                this.channel = ch;
+                //this.myId = ch.id().asLongText();
+                this.myId = "Player_" + Math.random();
+                System.out.println("Мой сетевой ID: " + this.myId);
                 ch.closeFuture().sync();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -82,26 +93,22 @@ public class PacmanGame extends ApplicationAdapter {
         float deltaTime = Gdx.graphics.getDeltaTime();
 
         if (progress < 1.0f) {
-            // Мы в пути между клетками
-            progress += deltaTime * 5; // Скорость перемещения (5 клеток в секунду)
+            progress += deltaTime * 5;
             if (progress > 1.0f) progress = 1.0f;
 
-            // Плавно вычисляем визуальную позицию (интерполяция)
             visualX = (currX + (targetX - currX) * progress) * 20;
             visualY = (currY + (targetY - currY) * progress) * 20;
         } else {
-            // Мы стоим в клетке, пора выбрать следующую!
             currX = targetX;
             currY = targetY;
 
             if (channel != null && channel.isActive()) {
-                channel.writeAndFlush(new com.pacman.common.PacketPlayerPos(currX, currY));
+                channel.writeAndFlush(new com.pacman.common.PacketPlayerPos(currX, currY, myId));
             }
 
             visualX = currX * 20;
             visualY = currY * 20;
 
-            // Логика Пункта 8: Приоритеты кнопок
             int nextDX = 0;
             int nextDY = 0;
 
@@ -111,7 +118,6 @@ public class PacmanGame extends ApplicationAdapter {
             if (Gdx.input.isKeyPressed(com.badlogic.gdx.Input.Keys.D)) nextDX = 1;
             else if (Gdx.input.isKeyPressed(com.badlogic.gdx.Input.Keys.A)) nextDX = -1;
 
-            // Проверяем возможность хода (сначала вертикаль, потом горизонталь - для Пункта 8.а)
             if (nextDY != 0 && map != null && !map.isWall(currX, currY + nextDY)) {
                 targetY = currY + nextDY;
                 progress = 0;
@@ -121,25 +127,43 @@ public class PacmanGame extends ApplicationAdapter {
             }
         }
 
-        batch.begin();
+
         // Отрисовка карты
+        batch.begin();
         if (map != null) {
             for (int y = 0; y < map.getHeight(); y++) {
                 for (int x = 0; x < map.getWidth(); x++) {
-                    if (map.getCell(x, y) == '#') batch.draw(wallTex, x * 20, y * 20);
+                    if (map.getCell(x, y) == '#') {
+                        batch.draw(wallTex, x * 20, y * 20);
+                    } else if (map.getCell(x, y) == '.') {
+                        // Используем другую текстуру для точек, чтобы не трогать pacmanTex
+                        batch.draw(otherPacTex, x * 20 + 8, y * 20 + 8, 4, 4);
+                    }
                 }
             }
         }
+        batch.end();
 
+
+        batch.begin();
+//        for (com.pacman.common.PacketPlayerPos op : otherPlayers) {
+//            System.out.println("Я: " + myId + " | В списке: " + op.id);
+//        }
+        // Отрисовка чужих
         for (com.pacman.common.PacketPlayerPos op : otherPlayers) {
-            if (op.x == currX && op.y == currY) continue;
+            if (op.id != null && myId != null && op.id.equals(myId)) {
+                continue;
+            }
 
-            // Рисуем чужого Пакмана
-            batch.draw(pacmanTex, op.x * 20, op.y * 20);
+            if ((op.x == currX && op.y == currY) || (op.x == targetX && op.y == targetY)) {
+                continue;
+            }
+
+            batch.draw(otherPacTex, op.x * 20, op.y * 20);
         }
 
-        // Рисуем Пакмана в визуальной позиции
-        batch.draw(pacmanTex, visualX, visualY);
+         //  Рисуем СЕБЯ
+        batch.draw(pacmanTex, (int)visualX, (int)visualY);
         batch.end();
     }
 
@@ -148,10 +172,14 @@ public class PacmanGame extends ApplicationAdapter {
         batch.dispose();
         wallTex.dispose();
         pacmanTex.dispose();
+        otherPacTex.dispose();
     }
 
     public void updateOtherPlayers(java.util.List<com.pacman.common.PacketPlayerPos> players) {
         this.otherPlayers = players;
+        if (players.size() > 1) {
+            System.out.println("Вижу других игроков! Всего в списке: " + players.size());
+        }
     }
 
     public void setMap(com.pacman.common.GameMap newMap) {

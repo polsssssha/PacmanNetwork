@@ -19,14 +19,14 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof com.pacman.common.GameMap) {
-            game.setMap((com.pacman.common.GameMap) msg);
-        }
+        if (msg instanceof java.util.List) {
+            java.util.List<com.pacman.common.PacketPlayerPos> players = (java.util.List<com.pacman.common.PacketPlayerPos>) msg;
 
-        else if (msg instanceof com.pacman.common.PacketAllPlayers) {
-            com.pacman.common.PacketAllPlayers all = (com.pacman.common.PacketAllPlayers) msg;
-            // Передаем список всех игроков в основной класс игры
-            game.updateOtherPlayers(all.players);
+            game.updateOtherPlayers(players);
+
+           // System.out.println("Клиент получил список игроков! Кол-во: " + players.size());
+        } else if (msg instanceof com.pacman.common.GameMap) {
+            game.setMap((com.pacman.common.GameMap) msg);
         }
     }
 

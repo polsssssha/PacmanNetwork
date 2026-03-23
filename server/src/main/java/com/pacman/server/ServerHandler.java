@@ -24,24 +24,38 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        // Убираем игрока, когда он вышел
         playerPositions.remove(ctx.channel());
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof com.pacman.common.PacketPlayerPos) {
-            // Обновляем позицию того, кто прислал пакет
-            playerPositions.put(ctx.channel(), (com.pacman.common.PacketPlayerPos) msg);
+            com.pacman.common.PacketPlayerPos pos = (com.pacman.common.PacketPlayerPos) msg;
 
-            // Собираем все позиции в один пакет
-            com.pacman.common.PacketAllPlayers allPlayers = new com.pacman.common.PacketAllPlayers(
-                    new ArrayList<>(playerPositions.values())
-            );
+//            String clientId = ctx.channel().id().asLongText();
+//            pos.id = clientId;
 
-            // Рассылаем всем!
-            for (Channel ch : playerPositions.keySet()) {
-                ch.writeAndFlush(allPlayers);
+            playerPositions.put(ctx.channel(), pos);
+
+            com.pacman.common.GameMap map = com.pacman.server.ServerLauncher.map;
+            if (map != null && map.getCell(pos.x, pos.y) == '.') {
+                map.setCell(pos.x, pos.y, ' '); // Точка исчезает!
+                // Рассылаем обновленную карту ВСЕМ
+                for (io.netty.channel.Channel ch : playerPositions.keySet()) {
+                    ch.writeAndFlush(map);
+                }
+            }
+
+            broadcastPlayers();
+        }
+    }
+    private void broadcastPlayers() {
+        java.util.ArrayList<com.pacman.common.PacketPlayerPos> allPositions =
+                new java.util.ArrayList<>(playerPositions.values());
+
+        for (io.netty.channel.Channel ch : playerPositions.keySet()) {
+            if (ch.isActive()) {
+                ch.writeAndFlush(allPositions);
             }
         }
     }
