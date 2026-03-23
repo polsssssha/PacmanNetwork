@@ -18,6 +18,8 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 
 public class PacmanGame extends ApplicationAdapter {
+
+    java.util.List<com.pacman.common.PacketPlayerPos> otherPlayers = new java.util.ArrayList<>();
     SpriteBatch batch;
     Texture wallTex;
     Texture pacmanTex;
@@ -97,8 +99,6 @@ public class PacmanGame extends ApplicationAdapter {
             }
 
             visualX = currX * 20;
-
-            visualX = currX * 20;
             visualY = currY * 20;
 
             // Логика Пункта 8: Приоритеты кнопок
@@ -122,7 +122,7 @@ public class PacmanGame extends ApplicationAdapter {
         }
 
         batch.begin();
-        // Отрисовка карты (код остается тот же)
+        // Отрисовка карты
         if (map != null) {
             for (int y = 0; y < map.getHeight(); y++) {
                 for (int x = 0; x < map.getWidth(); x++) {
@@ -130,6 +130,14 @@ public class PacmanGame extends ApplicationAdapter {
                 }
             }
         }
+
+        for (com.pacman.common.PacketPlayerPos op : otherPlayers) {
+            if (op.x == currX && op.y == currY) continue;
+
+            // Рисуем чужого Пакмана
+            batch.draw(pacmanTex, op.x * 20, op.y * 20);
+        }
+
         // Рисуем Пакмана в визуальной позиции
         batch.draw(pacmanTex, visualX, visualY);
         batch.end();
@@ -140,5 +148,13 @@ public class PacmanGame extends ApplicationAdapter {
         batch.dispose();
         wallTex.dispose();
         pacmanTex.dispose();
+    }
+
+    public void updateOtherPlayers(java.util.List<com.pacman.common.PacketPlayerPos> players) {
+        this.otherPlayers = players;
+    }
+
+    public void setMap(com.pacman.common.GameMap newMap) {
+        this.map = newMap;
     }
 }

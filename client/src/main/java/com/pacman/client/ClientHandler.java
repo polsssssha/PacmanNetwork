@@ -19,13 +19,15 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-
-        if (msg instanceof GameMap) {
-            game.map = (GameMap) msg;
-            System.out.println("Карта получена от сервера!");
+        if (msg instanceof com.pacman.common.GameMap) {
+            game.setMap((com.pacman.common.GameMap) msg);
         }
 
-        // Позже здесь мы будем обрабатывать и другие сообщения (позиции игроков)
+        else if (msg instanceof com.pacman.common.PacketAllPlayers) {
+            com.pacman.common.PacketAllPlayers all = (com.pacman.common.PacketAllPlayers) msg;
+            // Передаем список всех игроков в основной класс игры
+            game.updateOtherPlayers(all.players);
+        }
     }
 
     @Override
