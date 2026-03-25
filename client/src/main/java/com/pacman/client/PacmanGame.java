@@ -1,5 +1,6 @@
 package com.pacman.client;
 
+import com.pacman.common.PacketPlayerPos;
 import io.netty.channel.Channel;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelInitializer;
@@ -20,6 +21,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.Color;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Comparator;
 
 public class PacmanGame extends ApplicationAdapter {
 
@@ -113,7 +115,7 @@ public class PacmanGame extends ApplicationAdapter {
             currY = targetY;
 
             if (channel != null && channel.isActive()) {
-                channel.writeAndFlush(new com.pacman.common.PacketPlayerPos(currX, currY, myId, myScore));
+                channel.writeAndFlush(new PacketPlayerPos(currX, currY, myId, myScore));
             }
 
             visualX = currX * 20;
@@ -169,14 +171,9 @@ public class PacmanGame extends ApplicationAdapter {
 //            System.out.println("Я: " + myId + " | В списке: " + op.id);
 //        }
         // Отрисовка чужих
-        for (com.pacman.common.PacketPlayerPos op : otherPlayers) {
-            if (op.id != null && myId != null && op.id.equals(myId)) {
-                continue;
-            }
-
-            if ((op.x == currX && op.y == currY) || (op.x == targetX && op.y == targetY)) {
-                continue;
-            }
+        for (PacketPlayerPos op : otherPlayers) {
+            if (op.id != null && myId != null && op.id.equals(myId)) continue;
+            if ((op.x == currX && op.y == currY) || (op.x == targetX && op.y == targetY)) continue;
 
             batch.draw(otherPacTex, op.x * 20, op.y * 20);
         }
@@ -185,17 +182,46 @@ public class PacmanGame extends ApplicationAdapter {
         batch.draw(pacmanTex, (int)visualX, (int)visualY);
 
         //Отрисовка счета
+        List<PacketPlayerPos> leaderBoard = new ArrayList<>();
+        leaderBoard.add(new PacketPlayerPos(currX, currY, "YOU", myScore));
 
-        font.setColor(Color.YELLOW);
-        font.draw(batch, "SCORE: " + myScore, 20, Gdx.graphics.getHeight() - 20);
+        for (PacketPlayerPos op : otherPlayers) {
+            if (op.id != null && myId != null && !op.id.equals(myId)) {
+                leaderBoard.add(op);
+            }
+        }
 
-        int offset = 40;
-        for (com.pacman.common.PacketPlayerPos op : otherPlayers) {
-            if (op.id != null && myId != null && op.id.equals(myId)) continue;
+        leaderBoard.sort((p1, p2) -> Integer.compare(p2.score, p1.score));
 
-            font.setColor(Color.ORANGE);
-            font.draw(batch, "ENEMY SCORE: " + op.score, 20, Gdx.graphics.getHeight() - 20 - offset);
-            offset += 20;
+        int offset = 20;
+        for (int i = 0; i < leaderBoard.size(); i++) {
+            PacketPlayerPos p = leaderBoard.get(i);
+
+            if (p.id.equals("YOU")) {
+                font.setColor(Color.YELLOW);
+                font.draw(batch, (i + 1) + ". MY SCORE: " + p.score, 20, Gdx.graphics.getHeight() - offset);
+            } else {
+                font.setColor(Color.ORANGE);
+                String shortId = p.id.substring(0, Math.min(p.id.length(), 5));
+                font.draw(batch, (i + 1) + ". PLAYER " + shortId + ": " + p.score, 20, Gdx.graphics.getHeight() - offset);
+            }
+            offset += 25;
+        }
+
+        // Проверка победы
+        if (myScore >= 500) {
+            font.setColor(Color.GREEN);
+            font.getData().setScale(3.0f);
+            font.draw(batch, "YOU WIN!", Gdx.graphics.getWidth() / 4f, Gdx.graphics.getHeight() / 2f);
+            font.getData().setScale(1.2f);
+        } else {
+            for (PacketPlayerPos enemy : leaderBoard) {
+                if (!enemy.id.equals("YOU") && enemy.score >= 500) {
+                    font.setColor(Color.RED);
+                    font.draw(batch, "PLAYER " + enemy.id.substring(0, 5) + " WINS!", 50, Gdx.graphics.getHeight() / 2f);
+                    break;
+                }
+            }
         }
 
         batch.end();
@@ -203,11 +229,18 @@ public class PacmanGame extends ApplicationAdapter {
 
     @Override
     public void dispose() {
+        if (channel != null) {
+            channel.close();
+        }
+
         batch.dispose();
         wallTex.dispose();
         pacmanTex.dispose();
         otherPacTex.dispose();
         font.dispose();
+
+        System.out.println("Клиент полностью остановлен.");
+        System.exit(0);
     }
 
     public void updateOtherPlayers(java.util.List<com.pacman.common.PacketPlayerPos> players) {
