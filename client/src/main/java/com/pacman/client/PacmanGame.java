@@ -16,10 +16,14 @@ import com.pacman.common.GameMap;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.Color;
+import java.util.List;
+import java.util.ArrayList;
 
 public class PacmanGame extends ApplicationAdapter {
 
-    volatile java.util.List<com.pacman.common.PacketPlayerPos> otherPlayers = new java.util.ArrayList<>();
+    volatile List<com.pacman.common.PacketPlayerPos> otherPlayers = new java.util.ArrayList<>();
     SpriteBatch batch;
     Texture wallTex;
     Texture pacmanTex;
@@ -27,6 +31,9 @@ public class PacmanGame extends ApplicationAdapter {
     Channel channel;
     Texture otherPacTex;
     String myId;
+
+    BitmapFont font;
+    int myScore = 0;
 
     int currX = 1, currY = 1;
     int targetX = 1, targetY = 1;
@@ -56,6 +63,9 @@ public class PacmanGame extends ApplicationAdapter {
         pOther.dispose();
 
         map = new GameMap(23, 22);
+
+        font = new BitmapFont();
+        font.getData().setScale(1.2f);
 
         new Thread(() -> {
             NioEventLoopGroup group = new NioEventLoopGroup();
@@ -103,7 +113,7 @@ public class PacmanGame extends ApplicationAdapter {
             currY = targetY;
 
             if (channel != null && channel.isActive()) {
-                channel.writeAndFlush(new com.pacman.common.PacketPlayerPos(currX, currY, myId));
+                channel.writeAndFlush(new com.pacman.common.PacketPlayerPos(currX, currY, myId, myScore));
             }
 
             visualX = currX * 20;
@@ -119,9 +129,18 @@ public class PacmanGame extends ApplicationAdapter {
             else if (Gdx.input.isKeyPressed(com.badlogic.gdx.Input.Keys.A)) nextDX = -1;
 
             if (nextDY != 0 && map != null && !map.isWall(currX, currY + nextDY)) {
+
+                if (map.getCell(currX, currY + nextDY) == '.') {
+                    myScore += 10;
+                }
                 targetY = currY + nextDY;
                 progress = 0;
             } else if (nextDX != 0 && map != null && !map.isWall(currX + nextDX, currY)) {
+
+                if (map.getCell(currX + nextDX, currY) == '.') {
+                    myScore += 10;
+                }
+
                 targetX = currX + nextDX;
                 progress = 0;
             }
@@ -164,6 +183,21 @@ public class PacmanGame extends ApplicationAdapter {
 
          //  Рисуем СЕБЯ
         batch.draw(pacmanTex, (int)visualX, (int)visualY);
+
+        //Отрисовка счета
+
+        font.setColor(Color.YELLOW);
+        font.draw(batch, "SCORE: " + myScore, 20, Gdx.graphics.getHeight() - 20);
+
+        int offset = 40;
+        for (com.pacman.common.PacketPlayerPos op : otherPlayers) {
+            if (op.id != null && myId != null && op.id.equals(myId)) continue;
+
+            font.setColor(Color.ORANGE);
+            font.draw(batch, "ENEMY SCORE: " + op.score, 20, Gdx.graphics.getHeight() - 20 - offset);
+            offset += 20;
+        }
+
         batch.end();
     }
 
@@ -173,6 +207,7 @@ public class PacmanGame extends ApplicationAdapter {
         wallTex.dispose();
         pacmanTex.dispose();
         otherPacTex.dispose();
+        font.dispose();
     }
 
     public void updateOtherPlayers(java.util.List<com.pacman.common.PacketPlayerPos> players) {
