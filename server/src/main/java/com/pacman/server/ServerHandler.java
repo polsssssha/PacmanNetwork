@@ -12,15 +12,32 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServerHandler extends ChannelInboundHandlerAdapter {
 
     private static final ConcurrentHashMap<Channel, PacketPlayerPos> players = new ConcurrentHashMap<>();
+    private static int nextSpawnIndex = 0;
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
-        if (ServerLauncher.map != null) {
-            ctx.writeAndFlush(ServerLauncher.map);
-        }
+        GameMap map = ServerLauncher.map;
+        int spawnX = 1;
+        int spawnY = 1;
 
-        // Временный пакет для инициализации
-        players.put(ctx.channel(), new PacketPlayerPos(1, 1, "Connecting...", 0));
+        if (map != null) {
+            ctx.writeAndFlush(map);
+
+            int[][] corners = {
+                    {1, 1},
+                    {map.getWidth() - 2, 1},
+                    {1, map.getHeight() - 2},
+                    {map.getWidth() - 2, map.getHeight() - 2}
+            };
+
+            int[] point = corners[nextSpawnIndex % 4];
+            spawnX = point[0];
+            spawnY = point[1];
+
+            nextSpawnIndex++;
+        }
+        ctx.writeAndFlush(new PacketPlayerPos(spawnX, spawnY, "INIT", 0));
+        players.put(ctx.channel(), new PacketPlayerPos(spawnX, spawnY, "Connecting...", 0));
         System.out.println("Новый игрок! В сети: " + players.size());
     }
 

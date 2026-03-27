@@ -21,14 +21,17 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof List) {
-            List<PacketPlayerPos> players = (List<PacketPlayerPos>) msg;
-            game.updateOtherPlayers(players);
-
+            game.updateOtherPlayers((List<PacketPlayerPos>) msg);
         } else if (msg instanceof GameMap) {
             game.setMap((GameMap) msg);
+        } else if (msg instanceof PacketPlayerPos) {
+            PacketPlayerPos pos = (PacketPlayerPos) msg;
+            // Если сервер прислал INIT — это наша стартовая позиция
+            if ("INIT".equals(pos.id)) {
+                game.setStartPosition(pos.x, pos.y);
+            }
         }
     }
 
