@@ -1,6 +1,16 @@
 package com.pacman.server;
 
 import com.pacman.common.GameMap;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
+
 import java.io.IOException;
 
 public class ServerLauncher {
@@ -12,49 +22,33 @@ public class ServerLauncher {
 
         try {
             map = MapLoader.loadFromFile("map.txt");
+            if (map == null) return;
 
-            if (map != null) {
-                System.out.println("Карта успешно загружена!");
+            System.out.println("Карта загружена!");
 
-                for (int y = 0; y < map.getHeight(); y++) {
-                    for (int x = 0; x < map.getWidth(); x++) {
-                        if (map.getCell(x, y) == ' ') {
-                            map.setCell(x, y, '.');
-                        }
+            // Автоматическая расстановка точек в пустые клетки
+            for (int y = 0; y < map.getHeight(); y++) {
+                for (int x = 0; x < map.getWidth(); x++) {
+                    if (map.getCell(x, y) == ' ') {
+                        map.setCell(x, y, '.');
                     }
                 }
-                System.out.println("Точки расставлены на карте.");
-
-                new Thread(() -> {
-                    io.netty.channel.EventLoopGroup bossGroup = new io.netty.channel.nio.NioEventLoopGroup(1);
-                    io.netty.channel.EventLoopGroup workerGroup = new io.netty.channel.nio.NioEventLoopGroup();
-                    try {
-                        io.netty.bootstrap.ServerBootstrap b = new io.netty.bootstrap.ServerBootstrap();
-                        b.group(bossGroup, workerGroup)
-                                .channel(io.netty.channel.socket.nio.NioServerSocketChannel.class)
-                                .childHandler(new io.netty.channel.ChannelInitializer<io.netty.channel.socket.SocketChannel>() {
-                                    @Override
-                                    public void initChannel(io.netty.channel.socket.SocketChannel ch) {
-                                        ch.pipeline().addLast(new io.netty.handler.codec.serialization.ObjectEncoder());
-                                        ch.pipeline().addLast(new io.netty.handler.codec.serialization.ObjectDecoder(
-                                                io.netty.handler.codec.serialization.ClassResolvers.cacheDisabled(null)));
-                                        ch.pipeline().addLast(new ServerHandler());
-                                    }
-                                });
-
-                        System.out.println("Netty сервер слушает порт 8080...");
-                        b.bind(8080).sync().channel().closeFuture().sync();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    } finally {
-                        bossGroup.shutdownGracefully();
-                        workerGroup.shutdownGracefully();
-                    }
-                }).start();
             }
 
+            startNettyServer();
+
         } catch (IOException e) {
-            System.err.println("Ошибка: не удалось прочитать map.txt. Проверь, лежит ли он в корне проекта.");
+            System.err.println("Ошибка: не удалось найти map.txt");
         }
+    }
+
+    private static void startNettyServer() {
+        new Thread(() -> {
+            try {
+                new NettyServer(8080).run();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 }

@@ -1,12 +1,15 @@
 package com.pacman.client;
 
 import com.pacman.common.GameMap;
+import com.pacman.common.PacketPlayerPos;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
+import java.util.List;
+
 public class ClientHandler extends ChannelInboundHandlerAdapter {
 
-    private PacmanGame game;
+    private final PacmanGame game;
 
     public ClientHandler(PacmanGame game) {
         this.game = game;
@@ -14,19 +17,18 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
-        System.out.println("Успешно подключились к серверу!");
+        System.out.println("Подключение к серверу установлено!");
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof java.util.List) {
-            java.util.List<com.pacman.common.PacketPlayerPos> players = (java.util.List<com.pacman.common.PacketPlayerPos>) msg;
-
+        if (msg instanceof List) {
+            List<PacketPlayerPos> players = (List<PacketPlayerPos>) msg;
             game.updateOtherPlayers(players);
 
-           // System.out.println("Клиент получил список игроков! Кол-во: " + players.size());
-        } else if (msg instanceof com.pacman.common.GameMap) {
-            game.setMap((com.pacman.common.GameMap) msg);
+        } else if (msg instanceof GameMap) {
+            game.setMap((GameMap) msg);
         }
     }
 

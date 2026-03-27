@@ -12,15 +12,16 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 
 public class NettyServer {
-    private int port;
+    private final int port;
 
     public NettyServer(int port) {
         this.port = port;
     }
 
     public void run() throws Exception {
-        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
@@ -28,14 +29,15 @@ public class NettyServer {
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         public void initChannel(SocketChannel ch) {
-                            // Добавляем обработчики сериализации перед нашим ServerHandler
+                            // Сериализация объектов для передачи по сети
                             ch.pipeline().addLast(new ObjectEncoder());
                             ch.pipeline().addLast(new ObjectDecoder(ClassResolvers.cacheDisabled(null)));
                             ch.pipeline().addLast(new ServerHandler());
                         }
                     });
 
-            System.out.println("Сервер запущен на порту " + port);
+            System.out.println("Netty сервер запущен на порту: " + port);
+
             ChannelFuture f = b.bind(port).sync();
             f.channel().closeFuture().sync();
         } finally {
